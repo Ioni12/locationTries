@@ -20,12 +20,13 @@
     <script>
         
      // Initialize variables
+// Initialize variables
 let map;
-const defaultView = [0, 0]; // Default to [0,0] if geolocation fails
+const defaultView = [0, 0];
 const defaultZoom = 2;
 
 // Function to initialize the map
-function initMap(latitude, longitude, zoom = 13) {
+function initMap(latitude, longitude, accuracy, zoom = 13) {
     map = L.map('map').setView([latitude, longitude], zoom);
     
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -33,29 +34,83 @@ function initMap(latitude, longitude, zoom = 13) {
         attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
     }).addTo(map);
     
+    // Add a marker for the location
     L.marker([latitude, longitude]).addTo(map)
-        .bindPopup('Your approximate location')
+        .bindPopup('Your location')
         .openPopup();
+
+    // Add a circle to represent accuracy (if available)
+    if (accuracy) {
+        L.circle([latitude, longitude], {radius: accuracy}).addTo(map);
+    }
+}
+
+// Function to get location using browser's Geolocation API
+function getBrowserLocation() {
+    return new Promise((resolve, reject) => {
+        if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => resolve({
+                    latitude: position.coords.latitude,
+                    longitude: position.coords.longitude,
+                    accuracy: position.coords.accuracy
+                }),
+                (error) => reject(error),
+                {enableHighAccuracy: true, timeout: 5000, maximumAge: 0}
+            );
+        } else {
+            reject(new Error("Geolocation is not supported by this browser."));
+        }
+    });
 }
 
 // Function to get location from IP
 function getLocationFromIP() {
-    fetch('https://ipapi.co/json/')
+    return fetch('https://ipapi.co/json/')
         .then(response => response.json())
-        .then(data => {
-            const latitude = data.latitude;
-            const longitude = data.longitude;
-            console.log(`Location: ${latitude}, ${longitude}`);
-            initMap(latitude, longitude);
-        })
-        .catch(error => {
-            console.error("Error getting location:", error);
-            initMap(defaultView[0], defaultView[1], defaultZoom);
-        });
+        .then(data => ({
+            latitude: data.latitude,
+            longitude: data.longitude,
+            accuracy: 10000 // Assuming city-level accuracy (10km)
+        }));
 }
 
-// Call the function to get location and initialize the map
-getLocationFromIP(); 
+// Function to get the most precise location available
+async function getPreciseLocation() {
+    try {
+        // Try browser geolocation first
+        const browserLocation = await getBrowserLocation();
+        console.log("Using browser geolocation");
+        return browserLocation;
+    } catch (error) {
+        console.warn("Browser geolocation failed:", error);
+        
+        try {
+            // Fall back to IP-based geolocation
+            const ipLocation = await getLocationFromIP();
+            console.log("Using IP-based geolocation");
+            return ipLocation;
+        } catch (ipError) {
+            console.error("IP geolocation failed:", ipError);
+            // Return default location if both methods fail
+            return {latitude: defaultView[0], longitude: defaultView[1], accuracy: null};
+        }
+    }
+}
+
+// Main function to get location and initialize the map
+async function initializeMapWithLocation() {
+    try {
+        const location = await getPreciseLocation();
+        initMap(location.latitude, location.longitude, location.accuracy);
+    } catch (error) {
+        console.error("Failed to get location:", error);
+        initMap(defaultView[0], defaultView[1], null, defaultZoom);
+    }
+}
+
+// Call the main function
+initializeMapWithLocation(); 
     </script>
 </body>
 </html>
