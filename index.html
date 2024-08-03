@@ -19,43 +19,43 @@
     
     <script>
         
-        var map;
+     // Initialize variables
+let map;
+const defaultView = [0, 0]; // Default to [0,0] if geolocation fails
+const defaultZoom = 2;
 
-const success = (pos) => {
-    const latitude = pos.coords.latitude;
-    const longitude = pos.coords.longitude;
-    
-    // Initialize the map after getting coordinates
-    map = L.map('map').setView([latitude, longitude], 13);
+// Function to initialize the map
+function initMap(latitude, longitude, zoom = 13) {
+    map = L.map('map').setView([latitude, longitude], zoom);
     
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
     }).addTo(map);
     
-    // You can add a marker at the user's location if desired
     L.marker([latitude, longitude]).addTo(map)
-        .bindPopup('Your location')
+        .bindPopup('Your approximate location')
         .openPopup();
 }
 
-const error = (error) => {
-    console.error("Error getting location:", error);
-    // Initialize map with default coordinates if geolocation fails
-    map = L.map('map').setView([0, 0], 2);
-    
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-    }).addTo(map);
-    alert("permission denied");
+// Function to get location from IP
+function getLocationFromIP() {
+    fetch('https://ipapi.co/json/')
+        .then(response => response.json())
+        .then(data => {
+            const latitude = data.latitude;
+            const longitude = data.longitude;
+            console.log(`Location: ${latitude}, ${longitude}`);
+            initMap(latitude, longitude);
+        })
+        .catch(error => {
+            console.error("Error getting location:", error);
+            initMap(defaultView[0], defaultView[1], defaultZoom);
+        });
 }
 
-navigator.geolocation.getCurrentPosition(success, error, {
-    enableHighAccuracy: true,
-    timeout: 5000
-});
-        
+// Call the function to get location and initialize the map
+getLocationFromIP(); 
     </script>
 </body>
 </html>
